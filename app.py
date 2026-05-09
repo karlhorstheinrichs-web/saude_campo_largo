@@ -1,23 +1,19 @@
 """
-Modulo 5 - Dashboard IPCSO-S
-Projeto: Modelo Preditivo de Decisao Orcamentaria - Funcao Saude
-Campo Largo/PR
+IPCSO-S — Dashboard Principal v2
+Com autenticação Supabase Auth + entrada de dados
 """
 
 import os
-import math
 import warnings
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
+from auth import (inicializar_sessao, tela_login, widget_usuario_sidebar,
+                  requer_autenticacao)
 
-warnings.filterwarnings('ignore')
-
-# ============================================================
-# CONFIGURACAO DA PAGINA
-# ============================================================
+warnings.filterwarnings("ignore")
 
 st.set_page_config(
     page_title="IPCSO-S | Campo Largo",
@@ -26,15 +22,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Inicializa sessão
+inicializar_sessao()
+
+# Se não autenticado, mostra login
+if not st.session_state.autenticado:
+    tela_login()
+    st.stop()
+
 # ============================================================
 # CREDENCIAIS
 # ============================================================
 
 def get_credenciais():
     try:
-        url = st.secrets["SUPABASE_URL"]
-        key = st.secrets["SUPABASE_KEY"]
-        return url, key
+        return st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"]
     except:
         pass
     try:
@@ -48,16 +50,12 @@ def get_credenciais():
         pass
     return None, None
 
-# ============================================================
-# CONEXAO COM SUPABASE
-# ============================================================
-
 @st.cache_resource
 def conectar():
     from supabase import create_client
     url, key = get_credenciais()
     if not url or not key:
-        st.error("❌ Credenciais do Supabase não encontradas.")
+        st.error("❌ Credenciais não encontradas.")
         st.stop()
     return create_client(url, key)
 
@@ -99,41 +97,27 @@ def carregar_resultados_ipcso():
 # ============================================================
 
 SUBFUNCOES = {
-    1: "Atenção Básica",
-    2: "Assist. Hosp. e Ambulatorial",
-    3: "Suporte Profilático",
-    4: "Vigilância Sanitária",
-    5: "Vigilância Epidemiológica",
-    6: "Alimentação e Nutrição",
-    7: "Gestão do SUS",
-    8: "Outras Ações",
+    1: "Atenção Básica", 2: "Assist. Hosp. e Ambulatorial",
+    3: "Suporte Profilático", 4: "Vigilância Sanitária",
+    5: "Vigilância Epidemiológica", 6: "Alimentação e Nutrição",
+    7: "Gestão do SUS", 8: "Outras Ações",
 }
-
 CORES = {
     1: "#2196F3", 2: "#4CAF50", 3: "#FF9800", 4: "#9C27B0",
     5: "#F44336", 6: "#00BCD4", 7: "#795548", 8: "#607D8B",
 }
-
 MODELOS = {
     "A": "Previne Brasil", "B": "Tabela SUS",
     "C": "Custo misto",   "D": "Repasse programa"
 }
-
-COR_SEMAFORO = {
-    "vermelho": "#dc3545",
-    "amarelo":  "#ffc107",
-    "verde":    "#28a745",
-}
-
-EMOJI_SEMAFORO = {
-    "vermelho": "🔴",
-    "amarelo":  "🟡",
-    "verde":    "🟢",
-}
+COR_SEMAFORO   = {"vermelho": "#dc3545", "amarelo": "#ffc107", "verde": "#28a745"}
+EMOJI_SEMAFORO = {"vermelho": "🔴", "amarelo": "🟡", "verde": "🟢"}
 
 # ============================================================
 # SIDEBAR
 # ============================================================
+
+perfil = st.session_state.perfil
 
 with st.sidebar:
     st.title("🏥 IPCSO-S")
@@ -143,25 +127,44 @@ with st.sidebar:
     st.markdown("**Programa:** PPGPGP/UTFPR")
     st.markdown("**Pesquisador:** Karl Horst Heinrichs")
     st.divider()
-    pagina = st.radio(
-        "Navegação",
-        ["📊 Painel Geral", "📈 Séries Temporais", "🔔 Alertas MSM",
-         "🎯 IPCSO-S", "🗄️ Estrutura do Banco"]
-    )
+
+    # Páginas disponíveis por perfil
+    paginas_base = ["📊 Painel Geral", "📈 Séries Temporais",
+                    "🔔 Alertas MSM", "🎯 IPCSO-S", "🗄️ Estrutura do Banco"]
+    paginas_gestor = paginas_base + ["📥 Entrada de Dados"]
+    paginas_admin  = paginas_gestor + ["👑 Administração"]
+
+    if perfil == "admin":
+        opcoes = paginas_admin
+    elif perfil == "gestor":
+        opcoes = paginas_gestor
+    else:
+        opcoes = paginas_base
+
+    pagina = st.radio("Navegação", opcoes)
+    widget_usuario_sidebar()
 
 # ============================================================
 # CARREGA DADOS
 # ============================================================
 
-df     = carregar_dados_ambulatorial()
-df_sf  = carregar_subfuncoes()
-df_ac  = carregar_acoes()
+df    = carregar_dados_ambulatorial()
+df_sf = carregar_subfuncoes()
+df_ac = carregar_acoes()
 
 # ============================================================
-# PAGINA 1 — PAINEL GERAL
+# ROTEAMENTO DE PÁGINAS
 # ============================================================
 
-if pagina == "📊 Painel Geral":
+if pagina == "📥 Entrada de Dados":
+    from paginas.pg_entrada import render
+    render()
+
+elif pagina == "👑 Administração":
+    from paginas.pg_admin import render
+    render()
+
+elif pagina == "📊 Painel Geral":
     st.title("🏥 IPCSO-S — Painel de Monitoramento da Saúde Municipal")
     st.caption("Modelo Preditivo de Decisão Orçamentária | Campo Largo/PR | 2010–2024")
     st.divider()
@@ -171,36 +174,31 @@ if pagina == "📊 Painel Geral":
         st.stop()
 
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("📋 Registros", f"{len(df):,}")
-    with col2:
-        st.metric("🔼 Subfunções", df["subfuncao_id"].nunique())
-    with col3:
-        st.metric("📅 Série", f"{df['periodo'].min().year}–{df['periodo'].max().year}")
+    with col1: st.metric("📋 Registros", f"{len(df):,}")
+    with col2: st.metric("🔼 Subfunções", df["subfuncao_id"].nunique())
+    with col3: st.metric("📅 Série", f"{df['periodo'].min().year}–{df['periodo'].max().year}")
     with col4:
         df_msm = df[df["regime_msm"].notna()]
         alertas = 0
         if not df_msm.empty:
             ult = df_msm["periodo"].max()
             alertas = int((df_msm[df_msm["periodo"]==ult]["regime_msm"] != "equilibrio").sum())
-        st.metric("⚠️ Alertas", alertas, delta="Y1=1" if alertas>0 else "Y1=0",
-                  delta_color="inverse" if alertas>0 else "normal")
+        st.metric("⚠️ Alertas", alertas, delta="Y1=1" if alertas > 0 else "Y1=0",
+                  delta_color="inverse" if alertas > 0 else "normal")
 
     st.divider()
     st.subheader("📊 Produção Ambulatorial por Subfunção (2010–2024)")
-
     df_g = df.groupby(["periodo","subfuncao_id"])["total_procedimentos"].sum().reset_index()
     fig = go.Figure()
     for sf_id, sf_nome in SUBFUNCOES.items():
         d = df_g[df_g["subfuncao_id"]==sf_id]
         if not d.empty:
             fig.add_trace(go.Scatter(
-                x=d["periodo"], y=d["total_procedimentos"],
-                name=sf_nome, line=dict(color=CORES.get(sf_id,"#333"), width=2),
+                x=d["periodo"], y=d["total_procedimentos"], name=sf_nome,
+                line=dict(color=CORES.get(sf_id,"#333"), width=2),
                 hovertemplate=f"<b>{sf_nome}</b><br>%{{x|%b %Y}}<br>%{{y:,.0f}}<extra></extra>"
             ))
-    fig.add_vrect(x0="2020-03-01", x1="2021-06-01",
-                  fillcolor="red", opacity=0.08,
+    fig.add_vrect(x0="2020-03-01", x1="2021-06-01", fillcolor="red", opacity=0.08,
                   annotation_text="COVID-19", annotation_position="top left")
     fig.update_layout(height=450, xaxis_title="Período", yaxis_title="Procedimentos",
                       legend=dict(orientation="h", yanchor="bottom", y=1.02),
@@ -209,26 +207,9 @@ if pagina == "📊 Painel Geral":
     fig.update_yaxes(showgrid=True, gridcolor="#eee")
     st.plotly_chart(fig, use_container_width=True)
 
-    st.divider()
-    st.subheader("💠 Subfunções — LOA 2024")
-    if not df_sf.empty:
-        cols_disp = [c for c in ["codigo","nome","modelo_financiamento","valor_loa_2024"] if c in df_sf.columns]
-        d = df_sf[cols_disp].copy()
-        if "modelo_financiamento" in d.columns:
-            d["modelo_financiamento"] = d["modelo_financiamento"].map(MODELOS)
-        if "valor_loa_2024" in d.columns:
-            d["valor_loa_2024"] = d["valor_loa_2024"].apply(
-                lambda x: f"R$ {float(x):,.2f}" if x else "-")
-        st.dataframe(d, use_container_width=True, hide_index=True)
-
-# ============================================================
-# PAGINA 2 — SERIES TEMPORAIS
-# ============================================================
-
 elif pagina == "📈 Séries Temporais":
     st.title("📈 Análise de Séries Temporais de Demanda")
     st.divider()
-
     if df.empty:
         st.warning("Nenhum dado.")
         st.stop()
@@ -240,12 +221,10 @@ elif pagina == "📈 Séries Temporais":
                               format_func=lambda x: sf_opcoes[x])
     with c2:
         anos = sorted(df["ano"].unique())
-        ano_range = st.select_slider("Período", options=anos,
-                                     value=(min(anos), max(anos)))
+        ano_range = st.select_slider("Período", options=anos, value=(min(anos), max(anos)))
 
     dff = df[(df["subfuncao_id"]==sf_sel) &
              (df["ano"]>=ano_range[0]) & (df["ano"]<=ano_range[1])].copy()
-
     if dff.empty:
         st.warning("Sem dados.")
         st.stop()
@@ -263,8 +242,8 @@ elif pagina == "📈 Séries Temporais":
             name="Média móvel 6m", line=dict(color="#333", width=2.5, dash="dash")))
     fig2.add_vrect(x0="2020-03-01", x1="2021-06-01",
                    fillcolor="red", opacity=0.08, annotation_text="COVID-19")
-    fig2.update_layout(title=f"Produção — {SUBFUNCOES.get(sf_sel, sf_sel)}", height=400,
-                       plot_bgcolor="white", hovermode="x unified")
+    fig2.update_layout(title=f"Produção — {SUBFUNCOES.get(sf_sel, sf_sel)}",
+                       height=400, plot_bgcolor="white", hovermode="x unified")
     st.plotly_chart(fig2, use_container_width=True)
 
     if "variacao_mensal_pct" in dff.columns:
@@ -276,10 +255,6 @@ elif pagina == "📈 Séries Temporais":
         fig3.update_layout(height=250, plot_bgcolor="white", yaxis_title="%")
         st.plotly_chart(fig3, use_container_width=True)
 
-# ============================================================
-# PAGINA 3 — ALERTAS MSM
-# ============================================================
-
 elif pagina == "🔔 Alertas MSM":
     st.title("🔔 Alertas Markov-switching — IPCSO-S")
     st.caption("Probabilidades de regime | Treinamento: 2010–2020")
@@ -287,7 +262,7 @@ elif pagina == "🔔 Alertas MSM":
 
     df_msm = df[df["regime_msm"].notna()].copy()
     if df_msm.empty:
-        st.warning("Probabilidades MSM não calculadas ainda. Execute o Módulo 2.")
+        st.warning("Probabilidades MSM não calculadas ainda.")
         st.stop()
 
     st.subheader("🚦 Semáforo por Subfunção")
@@ -297,7 +272,7 @@ elif pagina == "🔔 Alertas MSM":
         d = df_msm[df_msm["subfuncao_id"]==sf_id]
         if d.empty: continue
         ult = d.sort_values("periodo").iloc[-1]
-        regime = ult.get("regime_msm","equilibrio") or "equilibrio"
+        regime   = ult.get("regime_msm","equilibrio") or "equilibrio"
         prob_al  = float(ult.get("prob_alerta",  0) or 0)
         prob_col = float(ult.get("prob_colapso", 0) or 0)
         emoji = "🟢" if regime=="equilibrio" else ("🟡" if regime=="alerta" else "🔴")
@@ -330,39 +305,16 @@ elif pagina == "🔔 Alertas MSM":
             plot_bgcolor="white", hovermode="x unified")
         st.plotly_chart(fig_msm, use_container_width=True)
 
-        c1, c2 = st.columns([1,2])
-        with c1:
-            dist = dp["regime_msm"].value_counts()
-            fig_pie = px.pie(values=dist.values, names=dist.index,
-                color=dist.index,
-                color_discrete_map={"equilibrio":"#28a745","alerta":"#ffc107","colapso":"#dc3545"},
-                hole=0.4)
-            fig_pie.update_layout(height=300)
-            st.plotly_chart(fig_pie, use_container_width=True)
-        with c2:
-            cols_tabela = [c for c in ["periodo","regime_msm","prob_equilibrio","prob_alerta","prob_colapso"] if c in dp.columns]
-            st.dataframe(
-                dp[cols_tabela].tail(12).rename(columns={
-                    "periodo":"Período","regime_msm":"Regime",
-                    "prob_equilibrio":"P(Equil.)","prob_alerta":"P(Alerta)","prob_colapso":"P(Colapso)"}),
-                use_container_width=True, hide_index=True)
-
-# ============================================================
-# PAGINA 4 — IPCSO-S
-# ============================================================
-
 elif pagina == "🎯 IPCSO-S":
     st.title("🎯 IPCSO-S — Recomendações de Suplementação Orçamentária")
     st.caption("Índice de Prioridade Composta | Campo Largo/PR")
     st.divider()
 
     df_ipcso = carregar_resultados_ipcso()
-
     if df_ipcso.empty:
         st.warning("Nenhum resultado encontrado. Execute o Módulo 3 primeiro.")
         st.stop()
 
-    # --- Métricas gerais ---
     total   = len(df_ipcso)
     critico = len(df_ipcso[df_ipcso["semaforo_cvi"] == "vermelho"])
     alerta  = len(df_ipcso[df_ipcso["semaforo_cvi"] == "amarelo"])
@@ -377,101 +329,54 @@ elif pagina == "🎯 IPCSO-S":
     with c5: st.metric("💰 Y2 Total",   f"R$ {y2_total:,.2f}")
 
     st.divider()
-
-    # --- Semáforo por subfunção ---
     st.subheader("🚦 Semáforo IPCSO-S por Subfunção")
     cols = st.columns(min(total, 4))
     for idx, (_, row) in enumerate(df_ipcso.sort_values("ipcso_s", ascending=False).iterrows()):
-        sf_id  = int(row["subfuncao_id"])
-        nome   = SUBFUNCOES.get(sf_id, f"Subfunção {sf_id}")
-        sem    = str(row.get("semaforo_cvi", "verde")).lower()
-        emoji  = EMOJI_SEMAFORO.get(sem, "⚪")
-        ipcso  = float(row.get("ipcso_s", 0))
-        y1     = bool(row.get("y1_previsto", False))
-        y2     = float(row.get("y2_estimado", 0))
+        sf_id = int(row["subfuncao_id"])
+        nome  = SUBFUNCOES.get(sf_id, f"Subfunção {sf_id}")
+        sem   = str(row.get("semaforo_cvi", "verde")).lower()
+        emoji = EMOJI_SEMAFORO.get(sem, "⚪")
         with cols[idx % 4]:
             st.markdown(f"**{nome}**")
             st.markdown(f"### {emoji} {sem.upper()}")
-            st.metric("IPCSO-S", f"{ipcso:.4f}")
-            st.caption(f"Y1: {'⚠ ALERTA' if y1 else '✓ Normal'}")
-            st.caption(f"Y2: R$ {y2:,.2f}")
+            st.metric("IPCSO-S", f"{float(row.get('ipcso_s',0)):.4f}")
+            st.caption(f"Y1: {'⚠ ALERTA' if row.get('y1_previsto') else '✓ Normal'}")
+            st.caption(f"Y2: R$ {float(row.get('y2_estimado',0)):,.2f}")
             st.divider()
 
-    # --- Gráfico de barras IPCSO-S ---
     st.subheader("📊 Ranking IPCSO-S por Subfunção")
     df_plot = df_ipcso.copy()
     df_plot["nome"] = df_plot["subfuncao_id"].apply(lambda x: SUBFUNCOES.get(int(x), f"SF{x}"))
     df_plot["cor"]  = df_plot["semaforo_cvi"].map(COR_SEMAFORO).fillna("#607D8B")
     df_plot = df_plot.sort_values("ipcso_s", ascending=True)
-
     fig_bar = go.Figure(go.Bar(
-        x=df_plot["ipcso_s"],
-        y=df_plot["nome"],
-        orientation="h",
+        x=df_plot["ipcso_s"], y=df_plot["nome"], orientation="h",
         marker_color=df_plot["cor"],
         text=df_plot["ipcso_s"].apply(lambda x: f"{x:.4f}"),
         textposition="outside",
         hovertemplate="<b>%{y}</b><br>IPCSO-S: %{x:.4f}<extra></extra>"
     ))
     fig_bar.add_vline(x=0.70, line_dash="dash", line_color="#dc3545",
-                      annotation_text="Limiar crítico (0.70)", annotation_position="top right")
+                      annotation_text="Limiar crítico (0.70)")
     fig_bar.add_vline(x=0.40, line_dash="dash", line_color="#ffc107",
-                      annotation_text="Limiar alerta (0.40)", annotation_position="top right")
+                      annotation_text="Limiar alerta (0.40)")
     fig_bar.update_layout(height=400, plot_bgcolor="white",
-                          xaxis=dict(range=[0, 1.1], title="IPCSO-S"),
-                          yaxis_title="")
+                          xaxis=dict(range=[0,1.1], title="IPCSO-S"), yaxis_title="")
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # --- Decomposição dos componentes ---
     st.divider()
-    st.subheader("🔬 Decomposição dos Componentes por Subfunção")
+    st.subheader("🔬 Decomposição dos Componentes")
     componentes = ["iam","icd","ics","pna","ipcso_s"]
     cols_disp   = [c for c in componentes if c in df_ipcso.columns]
-
     df_comp = df_ipcso[["subfuncao_id"] + cols_disp].copy()
-    df_comp["Subfunção"] = df_comp["subfuncao_id"].apply(lambda x: SUBFUNCOES.get(int(x), f"SF{x}"))
+    df_comp["Subfunção"] = df_comp["subfuncao_id"].apply(
+        lambda x: SUBFUNCOES.get(int(x), f"SF{x}"))
     df_comp = df_comp.drop(columns=["subfuncao_id"]).set_index("Subfunção")
     df_comp.columns = [c.upper() for c in df_comp.columns]
-
-    fig_heat = px.imshow(
-        df_comp.astype(float),
-        color_continuous_scale="RdYlGn_r",
-        aspect="auto",
-        text_auto=".3f",
-        zmin=0, zmax=1
-    )
-    fig_heat.update_layout(height=350, coloraxis_showscale=True)
+    fig_heat = px.imshow(df_comp.astype(float), color_continuous_scale="RdYlGn_r",
+                         aspect="auto", text_auto=".3f", zmin=0, zmax=1)
+    fig_heat.update_layout(height=350)
     st.plotly_chart(fig_heat, use_container_width=True)
-
-    # --- Tabela detalhada ---
-    st.divider()
-    st.subheader("📋 Tabela Detalhada de Recomendações")
-    cols_tabela = [c for c in [
-        "subfuncao_id","semaforo_cvi","ipcso_s","icd","ics","pna",
-        "y1_previsto","y2_estimado","cenario","fonte_recomendada"
-    ] if c in df_ipcso.columns]
-
-    df_tab = df_ipcso[cols_tabela].copy()
-    df_tab["subfuncao_id"] = df_tab["subfuncao_id"].apply(
-        lambda x: SUBFUNCOES.get(int(x), f"SF{x}"))
-    df_tab = df_tab.rename(columns={
-        "subfuncao_id":     "Subfunção",
-        "semaforo_cvi":     "Semáforo",
-        "ipcso_s":          "IPCSO-S",
-        "icd":              "ICD",
-        "ics":              "ICS",
-        "pna":              "PNA",
-        "y1_previsto":      "Y1",
-        "y2_estimado":      "Y2 (R$)",
-        "cenario":          "Cenário",
-        "fonte_recomendada":"Fonte",
-    })
-    st.dataframe(df_tab.sort_values("IPCSO-S", ascending=False),
-                 use_container_width=True, hide_index=True)
-
-# ============================================================
-# PAGINA 5 — ESTRUTURA DO BANCO
-# ============================================================
 
 elif pagina == "🗄️ Estrutura do Banco":
     st.title("🗄️ Estrutura do Banco de Dados")
@@ -480,7 +385,8 @@ elif pagina == "🗄️ Estrutura do Banco":
 
     st.subheader("📋 Ações Orçamentárias — LOA 2024")
     if not df_ac.empty:
-        cols_disp = [c for c in ["codigo_acao","titulo","modelo_financiamento","valor_loa_2024"] if c in df_ac.columns]
+        cols_disp = [c for c in ["codigo_acao","titulo","modelo_financiamento","valor_loa_2024"]
+                     if c in df_ac.columns]
         d = df_ac[cols_disp].copy()
         if "modelo_financiamento" in d.columns:
             d["modelo_financiamento"] = d["modelo_financiamento"].map(MODELOS)
@@ -500,5 +406,6 @@ elif pagina == "🗄️ Estrutura do Banco":
         "parametros_custo":             "Parâmetros MDS por modelo de financiamento",
         "parametros_institucionais_cvi":"Dados históricos para o CVI",
         "resultados_ipcso":             "Recomendações geradas pelo IPCSO-S",
+        "perfis_usuarios":              "Gestores e administradores do sistema",
     }.items():
         st.markdown(f"**`{tabela}`** — {desc}")

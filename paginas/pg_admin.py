@@ -17,9 +17,7 @@ def render():
 
     
     cliente = get_cliente(service=True)
-    service_key = st.secrets.get("SUPABASE_SERVICE_KEY", "NAO_ENCONTRADO")
-    st.write("Service key (primeiros 20 chars):", service_key[:20] if service_key else "VAZIA")
-
+        
     st.subheader("➕ Cadastrar Novo Gestor")
     with st.form("form_novo_usuario"):
         c1, c2 = st.columns(2)

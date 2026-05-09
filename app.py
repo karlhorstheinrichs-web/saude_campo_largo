@@ -156,7 +156,11 @@ df_ac = carregar_acoes()
 # ROTEAMENTO DE PÁGINAS
 # ============================================================
 
-if pagina == "📥 Entrada de Dados":
+if pagina == "🕸️ Rede Multiplex":
+    from paginas.pg_rede import render as render_rede
+    render_rede()
+
+elif pagina == "📥 Entrada de Dados":
     from paginas.pg_entrada import render
     render()
 

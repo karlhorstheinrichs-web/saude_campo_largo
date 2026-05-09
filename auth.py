@@ -25,8 +25,14 @@ def get_credenciais():
         pass
     return None, None
 
-def get_cliente():
+def get_cliente(service=False):
     url, key = get_credenciais()
+    if service:
+        try:
+            service_key = st.secrets["SUPABASE_SERVICE_KEY"]
+        except:
+            service_key = os.getenv("SUPABASE_SERVICE_KEY", key)
+        return create_client(url, service_key)
     return create_client(url, key)
 
 def inicializar_sessao():

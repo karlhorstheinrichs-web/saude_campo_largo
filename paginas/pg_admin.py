@@ -15,7 +15,7 @@ def render():
     st.caption("Cadastre e gerencie os gestores do sistema IPCSO-S")
     st.divider()
 
-    cliente = get_cliente()
+    cliente = get_cliente(service=True)
 
     st.subheader("➕ Cadastrar Novo Gestor")
     with st.form("form_novo_usuario"):

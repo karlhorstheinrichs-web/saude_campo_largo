@@ -130,7 +130,7 @@ with st.sidebar:
 
     # Páginas disponíveis por perfil
     paginas_base = ["📊 Painel Geral", "📈 Séries Temporais",
-                    "🔔 Alertas MSM", "🎯 IPCSO-S", "🗄️ Estrutura do Banco"]
+                    "🔔 Alertas MSM", "🎯 IPCSO-S", "🕸️ Rede Multiplex", "🗄️ Estrutura do Banco"]
     paginas_gestor = paginas_base + ["📥 Entrada de Dados"]
     paginas_admin  = paginas_gestor + ["👑 Administração"]
 

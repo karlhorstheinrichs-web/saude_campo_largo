@@ -6,5 +6,5 @@ supabase==2.10.0
 python-dotenv==1.0.1
 scikit-learn==1.5.0
 scipy==1.13.0
-networkx
-openpyxl
+networkx==3.3
+openpyxl==3.1.2
